@@ -1,6 +1,6 @@
 # Spriter2Spine
 
-Convert .scml files to spine .json file.
+Convert .scml files to spine .json files.
 
 Base on Spriter Pro R11 and Spine 3.8.
 
@@ -23,19 +23,19 @@ Execute the following command from the command line
 * search folder named 'test' from current folder, convert all the .scml file to spine json file, store them back in folder 'test' .
 
   ```
-  spriter2spine -i ./test -o ./test
+  ./spriter2spine.exe -i ./test -o ./test
   ```
 
 * search folder named 'test' from current folder, convert all the .scml file to spine json file, store them in a folder named 'output'.
 
   ```
-  spriter2spine -i ./test -o ./output
+  ./spriter2spine.exe -i ./test -o ./output
   ```
 
 * convert a file named 'Animation.scml' to 'xxx-entity name.json'.
 
   ```
-  spriter2spine -i ./Animation.scml -o xxx
+  ./spriter2spine.exe -i ./Animation.scml -o xxx
   ```
 
 ## Linux or Mac OS

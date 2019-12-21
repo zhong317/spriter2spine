@@ -23,19 +23,19 @@
 * 在当前文件夹中搜索文件夹'test', 读取其中所有scml后缀的文件, 将其转换为spine格式, 并将转换后的文件存储回'test'文件夹中.
 
   ```
-  spriter2spine -i ./test -o ./test
+  ./spriter2spine.exe -i ./test -o ./test
   ```
 
 * 在当前文件夹中搜索文件夹'test', 读取其中所有scml后缀的文件, 将其转换为spine格式, 并将转换后的文件存储在'output'文件夹中.
 
   ```
-  spriter2spine -i ./test -o ./output
+  ./spriter2spine.exe -i ./test -o ./output
   ```
 
 * 将文件名为'Animation.scml' 转换为名为 'xxx-动画实例名.json'.
 
   ```
-  spriter2spine -i ./Animation.scml -o xxx
+  ./spriter2spine.exe -i ./Animation.scml -o xxx
   ```
 
 ## Linux 或 Mac OS
