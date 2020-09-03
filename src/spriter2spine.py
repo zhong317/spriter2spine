@@ -11,6 +11,7 @@ import argparse
 # spine file extension
 SPINE_EXT = 'json'
 
+
 def load_xml(path):
     tree = ET.parse(path)
     xml_data = tree.getroot()
@@ -18,9 +19,11 @@ def load_xml(path):
     data_dict = dict(xmltodict.parse(xmlstr))
     return data_dict
 
+
 def write_json(data_dict, path): 
     with open(path, 'w+') as json_file:
         json.dump(data_dict, json_file, indent=4, sort_keys=True)
+
 
 def load_tags(obj, name):
     if not obj.has_key(name):
@@ -32,12 +35,14 @@ def load_tags(obj, name):
 
     return tag_objs
 
-def load_float(obj, name, default = None):
+
+def load_float(obj, name, default=None):
     if not obj.has_key(name): return default
     return float(obj[name])
 
+
 def gen_spine_obj(name):
-    return  {
+    return {
             'skeleton': {
                 'name': name,
                 'width': 0,
@@ -54,6 +59,7 @@ def gen_spine_obj(name):
             ]
      }
 
+
 def get_attachment_name(pic_name):
     name = pic_name
     ext_index = name.lower().rfind('.png')
@@ -61,8 +67,10 @@ def get_attachment_name(pic_name):
         name = name[0:ext_index] 
     return name
 
+
 def calc_spine_time(spriter_time):
     return round(spriter_time / 1000.0, 3)
+
 
 # to make a more cleaner data object,
 # the spriter data format is too dirty!
@@ -82,9 +90,7 @@ def extract_spriter_data(in_path):
                'height': float(f['@height']),
                'pivotx': float(f['@pivot_x']),
                'pivoty': float(f['@pivot_y'])
-           }
-
-    
+            }
     xml_entities = load_tags(xml_root, 'entity')
     entities = []
     for _, e in enumerate(xml_entities):
@@ -99,7 +105,7 @@ def extract_spriter_data(in_path):
         for _, oi in enumerate(xml_obj_infos):
             if oi['@type'] != 'bone': continue
             eobj['bones'].append({'name': oi['@name'], 'length': float(oi['@w'])})
-       
+
         xml_anis = load_tags(e, 'animation')
         for _, a in enumerate(xml_anis):
             ani = {
@@ -113,7 +119,8 @@ def extract_spriter_data(in_path):
                 'b': float(a.has_key('@b') and a['@b'] or 100),
                 'key': {},
                 'timelines': {}
-            } 
+            }
+
             eobj['anis'].append(ani)
 
             xml_keys = load_tags(a['mainline'], 'key')
@@ -141,7 +148,6 @@ def extract_spriter_data(in_path):
                     'name': xml_timeline['@name'],
                     'kfrms': [],
                     'is_bone': xml_timeline.has_key('@object_type'),
-                    
                 }
                 timelines[xml_timeline['@id']] = timeline
                 kfrms = timeline['kfrms']
@@ -196,25 +202,53 @@ def sort_parent(parent, root_first):
             if depth.has_key(cur_k): break
             depth[cur_k] = dep
 
-    lst.sort(key = lambda a: depth[a], reverse = not root_first)
+    lst.sort(key=lambda a: depth[a], reverse=not root_first)
     return lst
 
-def calcPosAndRotation(w, h, pivotx, pivoty, timeline):
-    scalex = timeline['scalex'] == None and 1 or timeline['scalex']
-    scaley = timeline['scaley'] == None and 1 or timeline['scaley']
 
+def save_children(parent, bone_lst, bone_init_info):
+    for _, name in enumerate(reversed(bone_lst)):
+        if not parent.has_key(name):
+            continue
+
+        p = parent[name]
+
+        if not bone_init_info.has_key(p):
+            continue
+
+        bone_init_info[p]['children'] = bone_init_info[p].has_key('children') and bone_init_info[p]['children'] or []
+        bone_init_info[p]['children'].append(name)
+
+
+def find_scales_in_keyfrm_state(time, states, default_sx, default_sy):
+    cur_st = None
+    for i, st in enumerate(reversed(states)):
+        if time >= st['time']:
+            cur_st = st
+            break
+
+    psx, psy = 1, 1
+    if not cur_st:
+        psx = default_sx
+        psy = default_sy
+    else:
+        psx = cur_st['sx']
+        psy = cur_st['sy']
+
+    return (psx, psy)
+
+
+def calcPosAndRotation(w, h, pivotx, pivoty, fx, fy, angle, scalex, scaley):
     x = (0.5 - pivotx) * w * scalex
     y = (0.5 - pivoty) * h * scaley
 
-    angle = timeline['angle'] or 0
     if angle:
         radian = angle * math.pi / 180
         rx = x * math.cos(radian) - y * math.sin(radian)
         ry = x * math.sin(radian) + y * math.cos(radian)
         x, y = rx, ry
 
-    tx, ty = timeline['x'] or 0, timeline['y'] or 0
-    x, y = x + tx, y + ty
+    x, y = x + fx, y + fy
 
     return (x, y, angle)
 
@@ -280,34 +314,69 @@ def extract_bone_data(bones, entity, folder_file_map, bone_init_info, ani_timeli
 
     bones.append({'name': 'root'}) 
     bone_lst = sort_parent(parent, True)
+    save_children(parent, bone_lst, bone_init_info)
+
     for _, name in enumerate(bone_lst):
         w, h, pivotx, pivoty, sx, sy = 0, 0, 0, 0, 1, 1
-        timeline = bone_init_info[name]['timeline']
-        if not bone_init_info[name]['is_bone']:
+        info = bone_init_info[name]
+        timeline = info['timeline']
+        if not info['is_bone']:
             img_config = folder_file_map[timeline['folder']][timeline['file']]
             w, h = img_config['width'], img_config['height']
             pivoty, pivoty = img_config['pivotx'], img_config['pivoty']
 
-        x, y, angle = calcPosAndRotation(w, h, pivotx, pivoty, timeline)
-        sx = timeline['scalex'] == None and 1 or timeline['scalex']
-        sy = timeline['scaley'] == None and 1 or  timeline['scaley']
+
+        fx = timeline['x'] or 0
+        fy = timeline['y'] or 0
+
+        p = parent[name]
+
+        if not info.has_key('children') or len(info['children']) == 0:
+            sx = timeline['scalex'] == None and 1 or timeline['scalex']
+            sy = timeline['scaley'] == None and 1 or timeline['scaley']
+
+            while bone_init_info.has_key(p):
+                pinfo = bone_init_info[p]
+                ptimeline = pinfo['timeline']
+                psx = ptimeline['scalex'] == None and 1 or ptimeline['scalex']
+                psy = ptimeline['scaley'] == None and 1 or  ptimeline['scaley']
+
+                fx = fx * psx
+                fy = fy * psy
+
+                sx *= psx
+                sy *= psy
+                p = parent[p]
+
+        elif bone_init_info.has_key(p):
+                parent_timeline = bone_init_info[p]['timeline']
+                fx = fx * (parent_timeline['scalex'] == None and 1 or parent_timeline['scalex'])
+                fy = fy * (parent_timeline['scaley'] == None and 1 or parent_timeline['scaley'])
+
+        angle = timeline['angle'] or 0
+        x, y, angle = calcPosAndRotation(w, h, pivotx, pivoty, fx, fy, angle, sx, sy)
 
         # also save to bone init info
-        bone_init_info[name]['x'] = x
-        bone_init_info[name]['y'] = y 
-        bone_init_info[name]['angle'] = angle
-        bone_init_info[name]['sx'] = sx
-        bone_init_info[name]['sy'] = sy
+        info['x'] = x
+        info['y'] = y 
+        info['angle'] = angle
+        info['sx'] = sx
+        info['sy'] = sy
+
+        # save origin scale info
+        info['osx'] = timeline['scalex'] == None and 1 or timeline['scalex']
+        info['osy'] = timeline['scaley'] == None and 1 or timeline['scaley']
 
         bone_data = {
             'name': name,
             'parent': parent[name],
-            'length': bone_init_info[name]['length'],
+            'length': info['length'],
             'x': round(x, 2),
             'y': round(y, 2),
             'scaleX': sx,
             'scaleY': sy,
-            'rotation': angle
+            'rotation': angle,
+            #'transform': 'noScale'
         }
 
         bones.append(bone_data)
@@ -494,7 +563,8 @@ def record_key_frm_action(acts, ms_time, key, bone_init_info, act_type, arg):
 
          x, y, curve_info = arg[0], arg[1], arg[2]
          bx, by = bone_init_info[key]['sx'], bone_init_info[key]['sy']
-         data = {'time': time, 'x': round(x * bx, 2), 'y': round(y * by, 2)}
+
+         data = {'time': time, 'x': round(x / bx, 2), 'y': round(y / by, 2)}
          add_curve_info(data, curve_info)
 
          acts['bones'][key]['scale'].append(data)
@@ -670,11 +740,31 @@ def extract_animations(anis, slots, skins, entity, folder_file_map, bone_init_in
         # fix draw order action expression, to compatible spine 
         fix_draw_order_acts(acts, default_draw_order)
 
+        bone_time_state = {}
+        for t in ani['timelines'].values():
+            key = timeline_obj_key[t['id']]
+            kfrms =  t['kfrms']
+            bone_time_state[key] = []
+            states = bone_time_state[key]
+            for i, kfrm in enumerate(kfrms):
+                time = kfrm['time']
+                sx = kfrm['scalex'] == None and 1 or kfrm['scalex']
+                sy = kfrm['scaley'] == None and 1 or kfrm['scaley']
+                states.append({
+                    'sx': sx,
+                    'sy': sy,
+                    'time': time
+                })
+
+        # TODO: fix bone scale animation. - 2020.09.03
+        
         last_attachment = {}
         for t in ani['timelines'].values():
             key = timeline_obj_key[t['id']]
             kfrms =  t['kfrms']
             len_kfrms = len(kfrms)
+            info = bone_init_info[key]
+
             for i, kfrm in enumerate(kfrms):
                 w, h, pivotx, pivoty, sx, sy = 0, 0, 0, 0, 1, 1
                 time = kfrm['time']
@@ -694,9 +784,36 @@ def extract_animations(anis, slots, skins, entity, folder_file_map, bone_init_in
                         check_and_fill_skin(skins, key, attachment_name, img_config)
                         last_attachment[key] = attachment_name
 
-                x, y, angle = calcPosAndRotation(w, h, pivotx, pivoty, kfrm)
-                sx = kfrm['scalex'] == None and 1 or kfrm['scalex']
-                sy = kfrm['scaley'] == None and 1 or kfrm['scaley']
+                sx = 1
+                sy = 1
+                fx = kfrm['x'] or 0
+                fy = kfrm['y'] or 0
+
+                p = info['parent']
+                states = bone_time_state.has_key(p) and bone_time_state[p] or []
+
+                if not info.has_key('children') or len(info['children']) == 0:
+                    sx = kfrm['scalex'] == None and 1 or kfrm['scalex']
+                    sy = kfrm['scaley'] == None and 1 or kfrm['scaley']
+
+                    while bone_init_info.has_key(p):
+                        states = bone_time_state[p]
+                        psx, psy = find_scales_in_keyfrm_state(time, states, bone_init_info[p]['osx'], bone_init_info[p]['osy'])
+
+                        fx = fx * psx
+                        fy = fy * psy
+
+                        sx *= psx
+                        sy *= psy
+                        p = bone_init_info[p]['parent']
+                elif bone_init_info.has_key(p):
+                        psx, psy = find_scales_in_keyfrm_state(time, states, bone_init_info[p]['osx'], bone_init_info[p]['osy'])
+                        fx = fx * psx
+                        fy = fy * psy
+
+                angle = kfrm['angle'] or 0
+                x, y, angle = calcPosAndRotation(w, h, pivotx, pivoty, fx, fy, angle, sx, sy)
+                
                 curve_info = None
                 if kfrm['curve']:
                     if kfrm['curve'] == 'cubic':
