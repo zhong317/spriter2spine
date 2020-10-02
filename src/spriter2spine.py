@@ -323,7 +323,7 @@ def extract_bone_data(bones, entity, folder_file_map, bone_init_info, ani_timeli
         if not info['is_bone']:
             img_config = folder_file_map[timeline['folder']][timeline['file']]
             w, h = img_config['width'], img_config['height']
-            pivoty, pivoty = img_config['pivotx'], img_config['pivoty']
+            pivotx, pivoty = img_config['pivotx'], img_config['pivoty']
 
 
         fx = timeline['x'] or 0
@@ -774,7 +774,7 @@ def extract_animations(anis, slots, skins, entity, folder_file_map, bone_init_in
                 if kfrm['file']:
                     img_config = folder_file_map[kfrm['folder']][kfrm['file']]
                     w, h = img_config['width'], img_config['height']
-                    pivoty, pivoty = img_config['pivotx'], img_config['pivoty']
+                    pivotx, pivoty = img_config['pivotx'], img_config['pivoty']
                     attachment_name = get_attachment_name(img_config['name'])
                     if (not last_attachment.has_key(key)\
                         or attachment_name != last_attachment[key]):
