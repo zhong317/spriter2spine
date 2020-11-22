@@ -48,7 +48,7 @@ def gen_spine_obj(name):
                 'width': 0,
                 'height': 0,
                 'hash': ' ',
-                'spine': '3.8.75',
+                'spine': '3.8.99',
                 'fps': 30
             },
             'bones': [],
